@@ -70,13 +70,16 @@
                    (setf (mem-ref mybuff :uint) (car bufq)
                          bufq (cdr bufq))
                    (al:buffer-data (mem-ref mybuff :uint) #x1101 buffer (* *cap_size* (cffi:foreign-type-size :short)) *freq*)
+                   (when (= count 0)
+                     (format t "~s~%" (loop for i from 0 below *cap_size*
+                                            collect (mem-aref buffer :short i))))
                    (%al:source-queue-buffers (mem-aref hellosource :uint 0) 1 mybuff)
                    (%al:get-source-i (mem-aref hellosource :uint 0) :source-state state)
                    (when (/= (mem-ref state :int) #x1012)
                      (al:source-play (mem-aref hellosource :uint 0)))
                    (incf count)
                    (cffi:foreign-free state))))
-             (when (= count 50)
+             (when (= count 50000000000000000)
                (return)))
 
     (cffi:foreign-free buffer)
