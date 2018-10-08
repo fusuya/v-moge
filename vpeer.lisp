@@ -30,32 +30,32 @@
   (eye nil)
   (mouth nil))
 
-(defun re-draw (new-img moge func frame ol)
+(defun re-draw (new-img moge func ol)
   (gtk-widget-destroy (funcall func moge))
   (funcall (fdefinition `(setf ,func)) new-img moge)
-  (gtk-container-add frame (funcall func moge))
+  ;;(gtk-container-add frame (funcall func moge))
   (gtk-overlay-add-overlay ol (funcall func moge))
   (gtk-widget-show (funcall func moge))
   )
 
-(defun mabataki (imgs moge frame ol)
-  (re-draw (imgs-close-eye imgs) moge 'draw-eye frame ol)
+(defun mabataki (imgs moge ol)
+  (re-draw (imgs-close-eye imgs) moge 'draw-eye ol)
   (g-timeout-add
    200
    (lambda ()
-     (re-draw (imgs-open-eye imgs) moge 'draw-eye frame ol)
+     (re-draw (imgs-open-eye imgs) moge 'draw-eye ol)
      nil)))
 
-(defun kuchipaku (imgs moge frame ol)
-  (re-draw (imgs-open-mouth imgs) moge 'draw-mouth frame ol)
+(defun kuchipaku (imgs moge ol)
+  (re-draw (imgs-open-mouth imgs) moge 'draw-mouth ol)
   (g-timeout-add
    200
    (lambda ()
-     (re-draw (imgs-close-mouth imgs) moge 'draw-mouth frame ol)
+     (re-draw (imgs-close-mouth imgs) moge 'draw-mouth ol)
      nil)))
 
 ;;音声再生部分いらない
-(defun altest2 (imgs moge frame ol)
+(defun altest2 (imgs moge ol)
   ;;(print 7)
   (let* ((bufq nil)
          (error-code 0)
@@ -106,28 +106,30 @@
                                     (loop for i from 0 below *cap_size*
                                           collect (mem-aref buffer :short i)))
                            (equal (draw-mouth moge) (imgs-close-mouth imgs)))
-                  (kuchipaku imgs moge frame ol)
+                  (kuchipaku imgs moge ol)
                   )
-                ;; (when bufq
-                ;;   (setf (mem-ref mybuff :uint) (car bufq)
-                ;;         bufq (cdr bufq))
-                ;;   (al:buffer-data (mem-ref mybuff :uint) #x1101 buffer (* *cap_size* (cffi:foreign-type-size :short)) *freq*)
-                ;;   ;;(when (= count 0)
-                ;;   ;;  (format t "~s~%" (loop for i from 0 below *cap_size*
-                ;;   ;;                         collect (mem-aref buffer :short i))))
-                ;;   (%al:source-queue-buffers (mem-aref hellosource :uint 0) 1 mybuff)
-                ;;   (%al:get-source-i (mem-aref hellosource :uint 0) :source-state state)
-                ;;   (when (/= (mem-ref state :int) #x1012)
-                ;;     (al:source-play (mem-aref hellosource :uint 0)))
-                ;;   ;;(incf count)
-                ;;   )
+                (when bufq
+                  (setf (mem-ref mybuff :uint) (car bufq)
+                        bufq (cdr bufq))
+                  (al:buffer-data (mem-ref mybuff :uint) #x1101 buffer (* *cap_size* (cffi:foreign-type-size :short)) *freq*)
+                  ;;(when (= count 0)
+                  ;;  (format t "~s~%" (loop for i from 0 below *cap_size*
+                  ;;                         collect (mem-aref buffer :short i))))
+                  (%al:source-queue-buffers (mem-aref hellosource :uint 0) 1 mybuff)
+                  (%al:get-source-i (mem-aref hellosource :uint 0) :source-state state)
+                  (when (/= (mem-ref state :int) #x1012)
+                    (al:source-play (mem-aref hellosource :uint 0)))
+                  ;;(incf count)
+                  )
                 )
-              (gtk-main-iteration-do nil))
+              (gtk-main-iteration-do nil)
+           )
 
     (cffi:foreign-free buffer)
     (cffi:foreign-free samplesin)
     (cffi:foreign-free availbuffers)
     (cffi:foreign-free mybuff)
+    (cffi:foreign-free state)
     (cffi:foreign-free bufferholder)
 
     (alc:capture-stop inputdev)
@@ -183,24 +185,27 @@
                               ((= (char-code #\s) hoge)
                                (setf *end* nil)
                                ;;(mabataki imgs moge eye-f ol)
-                               (altest2 imgs moge mouth-f ol))))))
+                               (altest2 imgs moge ol))))))
       (g-timeout-add
        3000
        (lambda ()
          (if (> 3 (random 4))
-             (mabataki imgs moge eye-f ol))
+             (mabataki imgs moge ol))
          t))
       (let* ((screen (gtk-widget-get-screen  window))
              (visual (gdk-screen-get-rgba-visual screen)))
         (gtk-widget-set-visual window visual)
 
 
-        (gtk-container-add body-f (draw-body moge))
-        (gtk-container-add eye-f (draw-eye moge))
-        (gtk-container-add mouth-f (draw-mouth moge))
-        (gtk-overlay-add-overlay ol body-f)
-        (gtk-overlay-add-overlay ol eye-f)
-        (gtk-overlay-add-overlay ol mouth-f)
+        ;;(gtk-container-add body-f (draw-body moge))
+        ;;(gtk-container-add eye-f (draw-eye moge))
+        ;;(gtk-container-add mouth-f (draw-mouth moge))
+        ;; (gtk-overlay-add-overlay ol body-f)
+        ;; (gtk-overlay-add-overlay ol eye-f)
+        ;;(gtk-overlay-add-overlay ol mouth-f)
+        (gtk-overlay-add-overlay ol (draw-body moge))
+        (gtk-overlay-add-overlay ol (draw-eye moge))
+        (gtk-overlay-add-overlay ol (draw-mouth moge))
         (gtk-container-add window ol)
         ;; Show the window.
         (gtk-widget-show-all window))
