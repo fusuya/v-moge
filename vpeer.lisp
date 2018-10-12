@@ -19,6 +19,14 @@
 
 (defstruct imgs
   (img nil)
+  (lf-leg (load-img "./img/lf-leg0.png"))
+  (lf-leg1 (load-img "./img/lf-leg1.png"))
+  (lf-leg2 (load-img "./img/lf-leg2.png"))
+  (lf-leg3 (load-img "./img/lf-leg3.png"))
+  (lf-leg4 (load-img "./img/lf-leg4.png"))
+  (hige (load-img "./img/hige.png"))
+  (hige-up (load-img "./img/hige-up.png"))
+  (hige-down (load-img "./img/hige-down.png"))
   (body (load-img "./img/body.png"))
   (open-mouth (load-img "./img/open-mouth.png"))
   (close-mouth (load-img "./img/close-mouth.png"))
@@ -27,7 +35,9 @@
 
 (defstruct draw
   (body nil)
+  (hige nil)
   (eye nil)
+  (lf-leg nil)
   (mouth nil))
 
 (defstruct al
@@ -52,24 +62,41 @@
   (gtk-widget-show (funcall func moge))
   )
 
+;;time後にredraw
+(defun time-redraw (time bool new-img moge func ol)
+  (g-timeout-add time (lambda () (re-draw new-img moge func ol) bool)))
+
+
+;;まばたきアニメ
 (defun mabataki (imgs moge ol)
   (re-draw (imgs-close-eye imgs) moge 'draw-eye ol)
-  (g-timeout-add
-   200
-   (lambda ()
-     (re-draw (imgs-open-eye imgs) moge 'draw-eye ol)
-     nil)))
+  (time-redraw 200 nil (imgs-open-eye imgs) moge 'draw-eye ol))
 
 (defun kuchipaku (imgs moge ol)
   (re-draw (imgs-open-mouth imgs) moge 'draw-mouth ol)
-  (g-timeout-add
-   200
-   (lambda ()
-     (re-draw (imgs-close-mouth imgs) moge 'draw-mouth ol)
-     nil)))
+  (time-redraw 200 nil (imgs-close-mouth imgs) moge 'draw-mouth ol))
 
+;;ひげアニメ
+(defun hige-anime (imgs moge ol)
+  (re-draw (imgs-hige-up imgs) moge 'draw-hige ol)
+  (time-redraw 100 nil (imgs-hige imgs) moge 'draw-hige ol)
+  (time-redraw 200 nil (imgs-hige-down imgs) moge 'draw-hige ol)
+  (time-redraw 300 nil (imgs-hige imgs) moge 'draw-hige ol))
 
+;;鼻の横カキカキ
+(defun kakikaki (imgs moge ol)
+  (re-draw (imgs-lf-leg1 imgs) moge 'draw-lf-leg ol)
+  (time-redraw 100 nil (imgs-lf-leg2 imgs) moge 'draw-lf-leg ol)
+  (time-redraw 200 nil (imgs-lf-leg3 imgs) moge 'draw-lf-leg ol)
+  (time-redraw 400 nil (imgs-lf-leg4 imgs) moge 'draw-lf-leg ol)
+  (time-redraw 600 nil (imgs-lf-leg3 imgs) moge 'draw-lf-leg ol)
+  (time-redraw 800 nil (imgs-lf-leg4 imgs) moge 'draw-lf-leg ol)
+  (time-redraw 1000 nil (imgs-lf-leg3 imgs) moge 'draw-lf-leg ol)
+  (time-redraw 1100 nil (imgs-lf-leg2 imgs) moge 'draw-lf-leg ol)
+  (time-redraw 1200 nil (imgs-lf-leg1 imgs) moge 'draw-lf-leg ol)
+  (time-redraw 1300 nil (imgs-lf-leg imgs) moge 'draw-lf-leg ol))
 
+;;audio init
 (defun al-init (al)
   (let ((error-code 0))
     (setf (al-audiodev al) (alc:open-device nil)
@@ -87,7 +114,7 @@
     (%al:gen-sources 1 (al-source al))
     (setf error-code (al:get-error))))
 
-
+;;free
 (defun al-free (al)
   (let ((error-code 0))
     (cffi:foreign-free (al-buffer al))
@@ -112,7 +139,7 @@
     (alc:close-device (al-audiodev al))
     ))
 
-;;音声再生部分いらない
+;;マイクから音ひろう
 (defun altest2 (imgs moge ol)
   (let* ((error-code 0)
          (al (make-al)))
@@ -131,6 +158,7 @@
               (gtk-main-iteration-do nil))
     (al-free al)))
 
+;;キーイベント
 (defun key-event (key imgs moge ol window)
   (let ((hoge (gdk-event-key-keyval key)))
     (cond
@@ -149,56 +177,65 @@
        ;;(mabataki imgs moge eye-f ol)
        (altest2 imgs moge ol)))))
 
+
 (defun main ()
   (setf *random-state* (make-random-state t))
   (within-main-loop
-    (let* ((window (gtk-window-new :toplevel))
-           (body-f (make-instance 'gtk-frame :shadow-type :in :app-paintable t))
-           (eye-f (make-instance 'gtk-frame :shadow-type :in :app-paintable t))
-           (mouth-f (make-instance 'gtk-frame :shadow-type :in :app-paintable t))
-           (ol (make-instance 'gtk-overlay :app-paintable t))
-           (imgs (make-imgs))
-           (moge (make-draw :body (imgs-body imgs)
-                            :eye (imgs-open-eye imgs)
-                            :mouth (imgs-close-mouth imgs))))
-      ;; Signal handler for the window to handle the signal "destroy".
-      (gtk-window-resize window 480 320)
-      (setf (gtk-window-title window) "vpeer")
-      (setf (gtk-widget-app-paintable window) t)
-      ;;(setf (gtk-window-decorated window) nil)
-      (g-signal-connect window "destroy"
-                        (lambda (widget)
-                          (declare (ignore widget))
-                          (leave-gtk-main)))
-      (g-signal-connect window "key-press-event"
-                        (lambda (widget key)
-                          (declare (ignore widget))
-                          (key-event key imgs moge ol window )))
-      (g-timeout-add
-       3000
-       (lambda ()
-         (if (> 3 (random 4))
-             (mabataki imgs moge ol))
-         t))
-      (let* ((screen (gtk-widget-get-screen  window))
-             (visual (gdk-screen-get-rgba-visual screen)))
-        (gtk-widget-set-visual window visual)
+   (let* ((window (gtk-window-new :toplevel))
+          ;; (body-f (make-instance 'gtk-frame :shadow-type :in :app-paintable t))
+          ;; (eye-f (make-instance 'gtk-frame :shadow-type :in :app-paintable t))
+          ;; (mouth-f (make-instance 'gtk-frame :shadow-type :in :app-paintable t))
+          (ol (make-instance 'gtk-overlay :app-paintable t))
+          (imgs (make-imgs))
+          (moge (make-draw :body (imgs-body imgs) :lf-leg (imgs-lf-leg imgs)
+                           :hige (imgs-hige imgs)
+                           :eye (imgs-open-eye imgs)
+                           :mouth (imgs-close-mouth imgs)))
+          )
+     ;; Signal handler for the window to handle the signal "destroy".
+     (gtk-window-resize window 480 320)
+     (setf (gtk-window-title window) "vpeer")
+     (setf (gtk-widget-app-paintable window) t)
+     ;;(setf (gtk-window-decorated window) nil)
+     (g-signal-connect window "destroy"
+                       (lambda (widget)
+                         (declare (ignore widget))
+                         (leave-gtk-main)))
+     (g-signal-connect window "key-press-event"
+                       (lambda (widget key)
+                         (declare (ignore widget))
+                         (key-event key imgs moge ol window )))
+     (g-timeout-add
+      3000
+      (lambda ()
+        (let ((x (random 4)))
+          (case x
+            (0 (mabataki imgs moge ol))
+            (1 (hige-anime imgs moge ol))
+            (2 (kakikaki imgs moge ol))
+            (3 nil)))
+        t))
+     (let* ((screen (gtk-widget-get-screen  window))
+            (visual (gdk-screen-get-rgba-visual screen)))
+       (gtk-widget-set-visual window visual)
 
 
-        ;;(gtk-container-add body-f (draw-body moge))
-        ;;(gtk-container-add eye-f (draw-eye moge))
-        ;;(gtk-container-add mouth-f (draw-mouth moge))
-        ;; (gtk-overlay-add-overlay ol body-f)
-        ;; (gtk-overlay-add-overlay ol eye-f)
-        ;;(gtk-overlay-add-overlay ol mouth-f)
-        (gtk-overlay-add-overlay ol (draw-body moge))
-        (gtk-overlay-add-overlay ol (draw-eye moge))
-        (gtk-overlay-add-overlay ol (draw-mouth moge))
-        (gtk-container-add window ol)
-        ;; Show the window.
-        (gtk-widget-show-all window))
-      ;;(altest2 imgs frame window)
-      ))
+       ;;(gtk-container-add body-f (draw-body moge))
+       ;;(gtk-container-add eye-f (draw-eye moge))
+       ;;(gtk-container-add mouth-f (draw-mouth moge))
+       ;; (gtk-overlay-add-overlay ol body-f)
+       ;; (gtk-overlay-add-overlay ol eye-f)
+       ;;(gtk-overlay-add-overlay ol mouth-f)
+       (gtk-overlay-add-overlay ol (draw-body moge))
+       (gtk-overlay-add-overlay ol (draw-eye moge))
+       (gtk-overlay-add-overlay ol (draw-hige moge))
+       (gtk-overlay-add-overlay ol (draw-lf-leg moge))
+       (gtk-overlay-add-overlay ol (draw-mouth moge))
+       (gtk-container-add window ol)
+       ;; Show the window.
+       (gtk-widget-show-all window))
+     ;;(altest2 imgs frame window)
+     ))
   (join-gtk-main))
 
 (main)
