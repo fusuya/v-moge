@@ -12,16 +12,28 @@
 (defparameter *cap_size* 512)
 
 
+(defparameter *gazou-path-list*
+  '("./img/tail0.png" "./img/tail1.png" "./img/tail2.png"
+    "./img/lf-leg0.png" "./img/lf-leg1.png" "./img/lf-leg2.png" "./img/lf-leg3.png"
+    "./img/lf-leg4.png" "./img/hige.png" "./img/hige-up.png" "./img/hige-down.png"
+    "./img/body.png" "./img/open-mouth.png" "./img/close-mouth.png"
+    "./img/open-eye.png"  "./img/eye1.png" "./img/close-eye.png"
+    ))
 
+(defparameter *imgs-func-list*
+  (list 'imgs-tail0 'imgs-tail1 'imgs-tail2 'imgs-lf-leg 'imgs-lf-leg1
+        'imgs-lf-leg2 'imgs-lf-leg3 'imgs-lf-leg4 'imgs-hige
+        'imgs-hige-up 'imgs-hige-down 'imgs-body 'imgs-open-mouth
+        'imgs-close-mouth 'imgs-open-eye 'imgs-looking-eye 'imgs-close-eye))
 
 (defun load-img (img)
   (gtk-image-new-from-pixbuf (gdk-pixbuf-new-from-file img)))
 
 (defstruct imgs
   (img nil)
-  (tail0 (load-img"./img/tail0.png"))
-  (tail1 (load-img"./img/tail1.png"))
-  (tail2 (load-img"./img/tail2.png"))
+  (tail0 (load-img "./img/tail0.png"))
+  (tail1 (load-img "./img/tail1.png"))
+  (tail2 (load-img "./img/tail2.png"))
   (lf-leg (load-img "./img/lf-leg0.png"))
   (lf-leg1 (load-img "./img/lf-leg1.png"))
   (lf-leg2 (load-img "./img/lf-leg2.png"))
@@ -44,6 +56,9 @@
   (tail nil)
   (lf-leg nil)
   (mouth nil))
+
+(defparameter *draw-func-list*
+  (list 'draw-body 'draw-hige 'draw-eye 'draw-tail 'draw-lf-leg 'draw-mouth))
 
 (defstruct al
   (buf (cffi:foreign-alloc :uint :count 16))
@@ -223,6 +238,30 @@
          (4 nil)))
      t)))
 
+(defun gazou-reset (imgs width height)
+  (loop for path in *gazou-path-list*
+        for func in *imgs-func-list*
+        do (let* ((pix (gdk-pixbuf-new-from-file path))
+                  (new-pix (gdk-pixbuf-scale-simple pix width height :nearest))
+                  (img (gtk-image-new-from-pixbuf new-pix)))
+             (funcall (fdefinition `(setf ,func)) img imgs))))
+
+(defun change-size (imgs moge ol window)
+  (dolist (func *draw-func-list*)
+    (gtk-widget-destroy (funcall func moge)))
+  (multiple-value-bind (width height)
+      (gtk-window-get-size window)
+    (gazou-reset imgs width height)
+    (setf (draw-body moge) (imgs-body imgs)
+          (draw-eye moge) (imgs-open-eye imgs)
+          (draw-hige moge) (imgs-hige imgs)
+          (draw-mouth moge) (imgs-close-mouth imgs)
+          (draw-tail moge) (imgs-tail0 imgs)
+          (draw-lf-leg moge) (imgs-lf-leg imgs))
+    (dolist (func *draw-func-list*)
+      (gtk-overlay-add-overlay ol (funcall func moge))
+      (gtk-widget-show (funcall func moge)))))
+
 (defun main ()
   (setf *random-state* (make-random-state t))
   (within-main-loop
@@ -237,7 +276,8 @@
                             :eye (imgs-open-eye imgs)
                             :mouth (imgs-close-mouth imgs)))
            )
-      (gtk-window-resize window 480 320)
+      (gtk-window-resize window 580 420)
+      (change-size imgs moge ol window) ;;画像リサイズ
       (setf (gtk-window-title window) "vpeer")
       (setf (gtk-widget-app-paintable window) t)
       ;;(setf (gtk-window-decorated window) nil)
@@ -250,6 +290,11 @@
                         (lambda (widget key)
                           (declare (ignore widget))
                           (key-event key imgs moge ol window )))
+      ;;重たい
+      ;; (g-signal-connect window "configure-event"
+      ;;                   (lambda (widget hoge)
+      ;;                     (declare (ignore widget hoge))
+      ;;                     (change-size imgs moge ol window)))
       (random-anime imgs moge ol)
       (let* ((screen (gtk-widget-get-screen  window))
              (visual (gdk-screen-get-rgba-visual screen)))
