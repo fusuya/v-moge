@@ -9,7 +9,7 @@
 
 (defparameter *end* nil)
 (defparameter *freq* 4410)
-(defparameter *cap_size* 512)
+(defparameter *cap_size* 1024)
 
 
 (defparameter *gazou-path-list*
@@ -74,10 +74,10 @@
   (state (cffi:foreign-alloc :int :initial-element 0))
   (bufferholder (cffi:foreign-alloc :uint :count 16)))
 
+;;新しい画像を表示
 (defun re-draw (new-img moge func ol)
   (gtk-widget-destroy (funcall func moge))
   (funcall (fdefinition `(setf ,func)) new-img moge)
-  ;;(gtk-container-add frame (funcall func moge))
   (gtk-overlay-add-overlay ol (funcall func moge))
   (gtk-widget-show (funcall func moge))
   )
@@ -92,6 +92,7 @@
   (re-draw (imgs-close-eye imgs) moge 'draw-eye ol)
   (time-redraw 200 nil (imgs-open-eye imgs) moge 'draw-eye ol))
 
+;;口パク
 (defun kuchipaku (imgs moge ol)
   (re-draw (imgs-open-mouth imgs) moge 'draw-mouth ol)
   (time-redraw 200 nil (imgs-close-mouth imgs) moge 'draw-mouth ol))
@@ -170,15 +171,12 @@
 ;;マイクから音ひろう
 (defun altest2 (imgs moge ol )
   (let* ((error-code 0)
-         (al (make-al))
-         )
-    (mabataki imgs moge ol)
+         (al (make-al)))
     (al-init al)
     (alc:capture-start (al-inputdev al))
     (setf error-code (alc:get-error (al-inputdev al)))
     (loop  while (null *end*)
-           do
-              (%alc:get-integer-v (al-inputdev al) :capture-samples 1 (al-samplesin al))
+           do (%alc:get-integer-v (al-inputdev al) :capture-samples 1 (al-samplesin al))
               (when (> (mem-ref (al-samplesin al) :int) *cap_size*)
                 (%alc:capture-samples (al-inputdev al) (al-buffer al) *cap_size*)
                 ;;)
@@ -187,15 +185,7 @@
                                     (equalp (draw-mouth moge) (imgs-close-mouth imgs)))
                            (kuchipaku imgs moge ol)
                            (return))))
-              ;; (when (and (equalp (draw-mouth moge) (imgs-close-mouth imgs))
-              ;;            (find-if #'(lambda (x) (>= (abs x) 300))
-              ;;                     (loop for i from 0 below *cap_size*
-              ;;                           collect (mem-aref (al-buffer al) :short i)))
-              ;;            )
-              ;;   ;;nil))
-              ;;   (kuchipaku imgs moge ol)))
               (gtk-main-iteration-do nil))
-
     (al-free al)))
 
 ;;キーイベント
@@ -213,7 +203,6 @@
            (setf (gtk-window-decorated window) t)))
       ((= (char-code #\s) hoge) ;;音声入力開始
        (setf *end* nil)
-       ;;(mabataki imgs moge eye-f ol)
        (altest2 imgs moge ol )))))
 
 ;;目線変更
@@ -238,6 +227,7 @@
          (4 nil)))
      t)))
 
+;;画像サイズ変更
 (defun gazou-reset (imgs width height)
   (loop for path in *gazou-path-list*
         for func in *imgs-func-list*
@@ -246,6 +236,7 @@
                   (img (gtk-image-new-from-pixbuf new-pix)))
              (funcall (fdefinition `(setf ,func)) img imgs))))
 
+;;画像のサイズ変更
 (defun change-size (imgs moge ol window)
   (dolist (func *draw-func-list*)
     (gtk-widget-destroy (funcall func moge)))
@@ -266,17 +257,13 @@
   (setf *random-state* (make-random-state t))
   (within-main-loop
     (let* ((window (gtk-window-new :toplevel))
-           ;; (body-f (make-instance 'gtk-frame :shadow-type :in :app-paintable t))
-           ;; (eye-f (make-instance 'gtk-frame :shadow-type :in :app-paintable t))
-           ;; (mouth-f (make-instance 'gtk-frame :shadow-type :in :app-paintable t))
            (ol (make-instance 'gtk-overlay :app-paintable t))
            (imgs (make-imgs))
            (moge (make-draw :body (imgs-body imgs) :lf-leg (imgs-lf-leg imgs)
                             :hige (imgs-hige imgs) :tail (imgs-tail0 imgs)
                             :eye (imgs-open-eye imgs)
-                            :mouth (imgs-close-mouth imgs)))
-           )
-      (gtk-window-resize window 580 420)
+                            :mouth (imgs-close-mouth imgs))))
+      (gtk-window-resize window 570 380)
       (change-size imgs moge ol window) ;;画像リサイズ
       (setf (gtk-window-title window) "vpeer")
       (setf (gtk-widget-app-paintable window) t)
@@ -299,14 +286,6 @@
       (let* ((screen (gtk-widget-get-screen  window))
              (visual (gdk-screen-get-rgba-visual screen)))
         (gtk-widget-set-visual window visual)
-
-
-        ;;(gtk-container-add body-f (draw-body moge))
-        ;;(gtk-container-add eye-f (draw-eye moge))
-        ;;(gtk-container-add mouth-f (draw-mouth moge))
-        ;; (gtk-overlay-add-overlay ol body-f)
-        ;; (gtk-overlay-add-overlay ol eye-f)
-        ;;(gtk-overlay-add-overlay ol mouth-f)
         (gtk-overlay-add-overlay ol (draw-body moge))
         (gtk-overlay-add-overlay ol (draw-eye moge))
         (gtk-overlay-add-overlay ol (draw-hige moge))
