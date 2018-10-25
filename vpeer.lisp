@@ -9,7 +9,7 @@
 
 (defparameter *end* nil)
 (defparameter *freq* 4410)
-(defparameter *cap_size* 1024)
+(defparameter *cap_size* 2048)
 
 
 (defparameter *gazou-path-list*
@@ -18,19 +18,23 @@
     "./img/lf-leg4.png" "./img/hige.png" "./img/hige-up.png" "./img/hige-down.png"
     "./img/body.png" "./img/open-mouth.png" "./img/close-mouth.png"
     "./img/open-eye.png"  "./img/eye1.png" "./img/close-eye.png"
+    "./img/rf-leg0.png" "./img/rf-leg1.png" "./img/rf-leg2.png"
+    "./img/rf-leg3.png"
     ))
 
 (defparameter *imgs-func-list*
   (list 'imgs-tail0 'imgs-tail1 'imgs-tail2 'imgs-lf-leg 'imgs-lf-leg1
         'imgs-lf-leg2 'imgs-lf-leg3 'imgs-lf-leg4 'imgs-hige
         'imgs-hige-up 'imgs-hige-down 'imgs-body 'imgs-open-mouth
-        'imgs-close-mouth 'imgs-open-eye 'imgs-looking-eye 'imgs-close-eye))
+        'imgs-close-mouth 'imgs-open-eye 'imgs-looking-eye 'imgs-close-eye
+        'imgs-rf-leg0 'imgs-rf-leg1 'imgs-rf-leg2 'imgs-rf-leg3))
 
 (defun load-img (img)
   (gtk-image-new-from-pixbuf (gdk-pixbuf-new-from-file img)))
 
 (defstruct imgs
   (img nil)
+
   (tail0 (load-img "./img/tail0.png"))
   (tail1 (load-img "./img/tail1.png"))
   (tail2 (load-img "./img/tail2.png"))
@@ -39,6 +43,10 @@
   (lf-leg2 (load-img "./img/lf-leg2.png"))
   (lf-leg3 (load-img "./img/lf-leg3.png"))
   (lf-leg4 (load-img "./img/lf-leg4.png"))
+  (rf-leg0 (load-img "./img/rf-leg0.png"))
+  (rf-leg1 (load-img "./img/rf-leg1.png"))
+  (rf-leg2 (load-img "./img/rf-leg2.png"))
+  (rf-leg3 (load-img "./img/rf-leg3.png"))
   (hige (load-img "./img/hige.png"))
   (hige-up (load-img "./img/hige-up.png"))
   (hige-down (load-img "./img/hige-down.png"))
@@ -50,11 +58,14 @@
   (close-eye (load-img "./img/close-eye.png")))
 
 (defstruct draw
+  (rf-fr (make-instance 'gtk-frame))
+  (hige-fr (make-instance 'gtk-frame))
   (body nil)
   (hige nil)
   (eye nil)
   (tail nil)
   (lf-leg nil)
+  (rf-leg nil)
   (mouth nil))
 
 (defparameter *draw-func-list*
@@ -77,10 +88,11 @@
 ;;新しい画像を表示
 (defun re-draw (new-img moge func ol)
   (gtk-widget-destroy (funcall func moge))
-  (funcall (fdefinition `(setf ,func)) new-img moge)
-  (gtk-overlay-add-overlay ol (funcall func moge))
-  (gtk-widget-show (funcall func moge))
-  )
+  (funcall (fdefinition `(setf ,func)) new-img moge) ;;現在描画されてる画像
+  (gtk-overlay-add-overlay ol new-img)
+  (when (eq func 'draw-rf-leg)
+    (gtk-overlay-reorder-overlay ol new-img 1)) ;;右手をひげの裏にする
+  (gtk-widget-show (funcall func moge)))
 
 ;;time後にredraw
 (defun time-redraw (time bool new-img moge func ol)
@@ -111,6 +123,23 @@
   (time-redraw 200 nil (imgs-tail1 imgs) moge 'draw-tail ol)
   (time-redraw 300 nil (imgs-tail0 imgs) moge 'draw-tail ol))
 
+;;ノシ
+(defun noshi (imgs moge ol)
+  (re-draw (imgs-rf-leg1 imgs) moge 'draw-rf-leg ol)
+  (time-redraw 100 nil (imgs-rf-leg2 imgs) moge 'draw-rf-leg ol)
+  (time-redraw 200 nil (imgs-rf-leg1 imgs) moge 'draw-rf-leg ol)
+  (time-redraw 300 nil (imgs-rf-leg3 imgs) moge 'draw-rf-leg ol)
+  (time-redraw 400 nil (imgs-rf-leg1 imgs) moge 'draw-rf-leg ol)
+  (time-redraw 500 nil (imgs-rf-leg2 imgs) moge 'draw-rf-leg ol)
+  (time-redraw 600 nil (imgs-rf-leg1 imgs) moge 'draw-rf-leg ol)
+  (time-redraw 700 nil (imgs-rf-leg3 imgs) moge 'draw-rf-leg ol)
+  (time-redraw 800 nil (imgs-rf-leg1 imgs) moge 'draw-rf-leg ol)
+  (time-redraw 900 nil (imgs-rf-leg2 imgs) moge 'draw-rf-leg ol)
+  (time-redraw 1000 nil (imgs-rf-leg1 imgs) moge 'draw-rf-leg ol)
+  (time-redraw 1100 nil (imgs-rf-leg3 imgs) moge 'draw-rf-leg ol)
+  (time-redraw 1200 nil (imgs-rf-leg1 imgs) moge 'draw-rf-leg ol)
+  (time-redraw 1300 nil (imgs-rf-leg0 imgs) moge 'draw-rf-leg ol)
+  )
 
 ;;鼻の横カキカキ
 (defun kakikaki (imgs moge ol)
@@ -201,6 +230,8 @@
        (if (gtk-window-decorated window)
            (setf (gtk-window-decorated window) nil)
            (setf (gtk-window-decorated window) t)))
+      ((= (char-code #\n) hoge)
+       (noshi imgs moge ol))
       ((= (char-code #\s) hoge) ;;音声入力開始
        (setf *end* nil)
        (altest2 imgs moge ol )))))
@@ -248,6 +279,7 @@
           (draw-hige moge) (imgs-hige imgs)
           (draw-mouth moge) (imgs-close-mouth imgs)
           (draw-tail moge) (imgs-tail0 imgs)
+          (draw-rf-leg moge) (imgs-rf-leg0 imgs)
           (draw-lf-leg moge) (imgs-lf-leg imgs))
     (dolist (func *draw-func-list*)
       (gtk-overlay-add-overlay ol (funcall func moge))
@@ -261,7 +293,7 @@
            (imgs (make-imgs))
            (moge (make-draw :body (imgs-body imgs) :lf-leg (imgs-lf-leg imgs)
                             :hige (imgs-hige imgs) :tail (imgs-tail0 imgs)
-                            :eye (imgs-open-eye imgs)
+                            :eye (imgs-open-eye imgs) :rf-leg (imgs-rf-leg0 imgs)
                             :mouth (imgs-close-mouth imgs))))
       (gtk-window-resize window 570 380)
       (change-size imgs moge ol window) ;;画像リサイズ
@@ -288,10 +320,11 @@
         (gtk-widget-set-visual window visual)
         (gtk-overlay-add-overlay ol (draw-body moge))
         (gtk-overlay-add-overlay ol (draw-eye moge))
-        (gtk-overlay-add-overlay ol (draw-hige moge))
         (gtk-overlay-add-overlay ol (draw-tail moge))
-        (gtk-overlay-add-overlay ol (draw-lf-leg moge))
         (gtk-overlay-add-overlay ol (draw-mouth moge))
+        (gtk-overlay-add-overlay ol (draw-rf-leg moge))
+        (gtk-overlay-add-overlay ol (draw-hige moge))
+        (gtk-overlay-add-overlay ol (draw-lf-leg moge))
         (gtk-container-add window ol)
         ;; Show the window.
         (gtk-widget-show-all window))
